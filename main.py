@@ -1,14 +1,11 @@
-import datetime
-
-import blueprint as blueprint
 from flask import Flask, render_template, redirect, request, make_response, session, abort, jsonify
 
-from data.news import News
+from data.products import Products
 from data.users import User
 from data import db_session
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 
-from forms.news import NewsForm
+from forms.product import ProductForm
 from forms.user import RegisterForm, LoginForm
 
 app = Flask(__name__)
@@ -25,12 +22,8 @@ def main():
 @app.route("/")
 def index():
     db_sess = db_session.create_session()
-    if current_user.is_authenticated:
-        news = db_sess.query(News).filter(
-            (News.user == current_user) | (News.is_private != True))
-    else:
-        news = db_sess.query(News).filter(News.is_private != True)
-    return render_template("index.html", news=news)
+    products = db_sess.query(Products).all()
+    return render_template("index.html", products=products, title="Главное Меню")
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -48,8 +41,7 @@ def reqister():
                                    message="Такой пользователь уже есть")
         user = User(
             name=form.name.data,
-            email=form.email.data,
-            about=form.about.data
+            email=form.email.data
         )
         user.set_password(form.password.data)
         db_sess.add(user)
@@ -72,14 +64,6 @@ def cookie_test():
         res.set_cookie("visits_count", '1',
                        max_age=60 * 60 * 24 * 365 * 2)
     return res
-
-
-@app.route("/session_test")
-def session_test():
-    visits_count = session.get('visits_count', 0)
-    session['visits_count'] = visits_count + 1
-    return make_response(
-        f"Вы пришли на эту страницу {visits_count + 1} раз")
 
 
 @login_manager.user_loader
@@ -113,18 +97,19 @@ def logout():
 @app.route('/news',  methods=['GET', 'POST'])
 @login_required
 def add_news():
-    form = NewsForm()
+    form = ProductForm()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
-        news = News()
-        news.title = form.title.data
-        news.content = form.content.data
-        news.is_private = form.is_private.data
-        current_user.news.append(news)
+        product = Products()
+        product.title = form.title.data
+        product.content = form.content.data
+        product.coast = form.coast.data
+        print(form.image.data)
+        current_user.product.append(product)
         db_sess.merge(current_user)
         db_sess.commit()
         return redirect('/')
-    return render_template('news.html', title='Добавление новости',
+    return render_template('product.html', title='Добавление товар',
                            form=form)
 
 
@@ -132,8 +117,8 @@ def add_news():
 @login_required
 def news_delete(id):
     db_sess = db_session.create_session()
-    news = db_sess.query(News).filter(News.id == id,
-                                      News.user == current_user
+    news = db_sess.query(Products).filter(Products.id == id,
+                                      Products.user == current_user
                                       ).first()
     if news:
         db_sess.delete(news)
@@ -146,41 +131,41 @@ def news_delete(id):
 @app.route('/news/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_news(id):
-    form = NewsForm()
+    form = ProductForm()
     if request.method == "GET":
         db_sess = db_session.create_session()
-        news = db_sess.query(News).filter(News.id == id,
-                                          News.user == current_user
+        product = db_sess.query(Products).filter(Products.id == id,
+                                          Products.user == current_user
                                           ).first()
-        if news:
-            form.title.data = news.title
-            form.content.data = news.content
-            form.is_private.data = news.is_private
+        if product:
+            form.title.data = product.title
+            form.content.data = product.content
+            form.coast.data = product.coast
         else:
             abort(404)
     if form.validate_on_submit():
         db_sess = db_session.create_session()
-        news = db_sess.query(News).filter(News.id == id,
-                                          News.user == current_user
+        product = db_sess.query(Products).filter(Products.id == id,
+                                          Products.user == current_user
                                           ).first()
-        if news:
-            news.title = form.title.data
-            news.content = form.content.data
-            news.is_private = form.is_private.data
+        if product:
+            product.title = form.title.data
+            product.content = form.content.data
+            product.coast = form.coast.data
             db_sess.commit()
             return redirect('/')
         else:
             abort(404)
-    return render_template('news.html',
+    return render_template('product.html',
                            title='Редактирование новости',
                            form=form
                            )
 
 
-@blueprint.route('/api/news')
+"""@blueprint.route('/api/news')
 def get_news():
     db_sess = db_session.create_session()
-    news = db_sess.query(News).all()
+    news = db_sess.query(Products).all()
     print(item for item in news)
     return jsonify(
         {
@@ -188,7 +173,7 @@ def get_news():
                 [item.to_dict(only=('title', 'content', 'user.name'))
                  for item in news]
         }
-    )
+    )"""
 
 
 if __name__ == '__main__':
